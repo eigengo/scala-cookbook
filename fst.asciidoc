@@ -24,7 +24,7 @@ trait Functions {
   def fooc(I: Int)(j: Int): Result = …
 }
 ```
-The “shape” of `fooc` is not `Int, Int` to `Result`, but `Int` to (`Int` to `Result `). To get to the final result, we write `fooc(1)(2)`. Writing `fooc(1)` yields a _function that takes an `Int` and returns a `Result `_. Think of the call `fooc(1)(2)` as `({ val f = fooc(1); f(2) })`. You may find this useful when writing functions that need some additional parameters, but need to be used in a place where only one parameter is used. Consider mapping over list of integers using a function that adds one to each element. We can write
+The “shape” of `fooc` is not `Int, Int` to `Result`, but `Int` to (`Int` to `Result`). To get to the final result, we write `fooc(1)(2)`. Writing `fooc(1)` yields a _function that takes an `Int` and returns a `Result `_. Think of the call `fooc(1)(2)` as `({ val f = fooc(1); f(2) })`. You may find this useful when writing functions that need some additional parameters, but need to be used in a place where only one parameter is used. Consider mapping over list of integers using a function that adds one to each element. We can write
 ```scala
 def add(a: Int, b: Int): Int = a + b
 List(1, 2, 3).map(x => add(1, x))
