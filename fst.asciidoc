@@ -67,6 +67,6 @@ And then instances for `Option` and `List`:
 ```scala
 implicit object OptionFunctor extends Functor[Option] {   override def fmap[A, B](f: A ⇒ B, m: Option[A]): Option[B] = m match {     case Some(a) ⇒ Some(f(a))     case None ⇒ None   } }  implicit object ListFunctor extends Functor[List] {   override def fmap[A, B](f: A ⇒ B, m: List[A]): List[B] = m match {     case Nil ⇒ Nil     case h::t ⇒ f(h)::fmap(f, t)   } }
 ```
-Now, can there be an instance of `Fu``nctor` for `Either`? I hope you are all shouting “no,” `Either` has kind `(*, *) -> *`, but `Functor` needs `* -> *`.
+Now, can there be an instance of `Functor` for `Either`? I hope you are all shouting “no,” `Either` has kind `(*, *) -> *`, but `Functor` needs `* -> *`.
 = Why?
 Perhaps this question should have been at the start. Nevertheless, the motivation is to be able to extract common patterns and to apply these patterns to existing types, without introducing inheritance hierarchy. Consider our functor and its `fmap` function that now works on `Option` and `List`, even though the authors of `List` and `Option` did not include `fmap` in their definitions. If you find yourself writing similar code, you should attempt to make it as generic as possible. Once you master this in the world of values (i.e. spotting that there is a `map`, `find`, `foreach` operation), you should master this at the level of types. As further reading, head over to [http://underscore.io/books/shapeless-guide/] and explore Shapeless: a library for type-level programming.
