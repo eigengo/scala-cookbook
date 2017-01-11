@@ -1,0 +1,72 @@
+= Functional & strongly-typed
+After reading this heading at the Cake Solutions blog, you’re no doubt thinking of Scala. Let’s highlight the functional and strongly-typed nature of Scala, and see if we can find some commonalities between functions and types: beginners in the language will be able to spot the similarities between types and values.
+== Functions and their application
+To define a function in Scala, we add it to a container ([`case`] `class`, `object`, or `trait`); alternatively we define a variable that holds a function.
+***
+A function here is a SAM (single anonymous method) class. Very broadly speaking, Java creates the SAM class at first application `invokedynamic`. Both methods and functions are then called using `invokevirtual` or `invokeinterface`.
+***
+I’ll use the term function from now on, for convenience and because they feel the same way in the Scala source code, but keep in mind that there is a difference. Let’s define `trait Functions` (a `trait` so we can use it later in `object FunctionsMain extends App with Functions { ... }`):
+```scala
+trait Functions {
+  type Result = …
+  def foo(I: Int, j: Int): Result = …
+}
+```
+It should not be surprising that to get the result of `foo`, we have to supply the parameters. (More accurately, supply the parameters in all parameter lists.) The “shape” of `foo` is `Int, Int` to `Result`. To get to the value, we write `foo(1, 2)`. If we do not supply the value of all the parameters; if we write `val x = foo(1, _: Int)`, the result is a _partially-applied function_. In this case, `x` is a variable of type `Int => Result`; a first-class function! When we apply it to the remaining parameter _x_, we get back the result—the same result we would get if we called `foo(1, x)`. In partial application, we supply some, but not all, parameters to the function, and we get back a function that takes the remaining parameters. It is possible, though clumsy and unnecessary, to write `({ val f = foo(1, _ : Int); f })(2)` instead of `foo(1, 2)`.
+== Currying
+To complete the discussion, let’s tackle currying. Where partial application is a process of reducing the number of parameters in a single parameter list, currying is a process of reducing the number of parameter lists. In Scala, we can define a function to have any number of parameter lists.
+***
+Most languages operate on parameters in parameter lists, and most languages have only one parameter list. A function `foo` with parameters of type `a` and `b`, returning type `r` written in a “natural” style (typically `foo(p1: a, p2: b): r` or `r foo(a p1, b p2)` is treated as `(a, b)` to  `r`: single parameter list with two elements to result. ML-like languages such as Haskell and F#, however, would translate their “natural” style (`foo :: a -> b -> r; foo p1 p2 = ...` or `foo (p1:a) (p2:b) : r`) to mean `a` to `b` to `r`: first parameter list to a function taking the remaining parameter list to result. Consequently, ML-style languages firstly curry, while others firstly partially apply.
+***
+```scala
+trait Functions {
+  type Result = …
+  def fooc(I: Int)(j: Int): Result = …
+}
+```
+The “shape” of `fooc` is not `Int, Int` to `Result`, but `Int` to (`Int` to `Result `). To get to the final result, we write `fooc(1)(2)`. Writing `fooc(1)` yields a _function that takes an `Int` and returns a `Result `_. Think of the call `fooc(1)(2)` as `({ val f = fooc(1); f(2) })`. You may find this useful when writing functions that need some additional parameters, but need to be used in a place where only one parameter is used. Consider mapping over list of integers using a function that adds one to each element. We can write
+```scala
+def add(a: Int, b: Int): Int = a + b
+List(1, 2, 3).map(x => add(1, x))
+List(…).map(x => add(2, x))
+```
+But it is more æsthetically pleasing and more efficient (why?) to have
+```scala
+def add(a: Int)(b: Int): Int = a + b
+List(1, 2, 3).map(add(1))
+List(…).map(add(2))
+```
+= Types & kinds
+So, we’re happy with applying functions. We are also happy that there can be a _thing_ that can be applied to parameters (or parameter lists) to yield a result. We are in a strongly-typed language, so the types of the parameters in the parameter lists are well-defined, together with the result type. We are used to saying “function from `Int` to `Int`”; we are also used to the fact that once we supply all the parameter [lists], we get the result value.
+It turns out that the same principle applies to types. The types we were using earlier are concrete types—they are fully-formed, they are not waiting for any parameters to be supplied. An `Int` is a fully-constructed type, just like `String`. We say that their _kind_ is `*`. Just like there are functions / methods that take parameters, there are types that take parameters. Our familiar `List` is just that. The kind of `List` is `* -> *`: `List` on its own is not a concrete type, it is a _type constructor_. If this were a function, it would be a function that takes one parameter and yields a result. But it is not a function, the parameter given to `List` cannot be a [runtime] value; it needs to be a [compile-time] type. Also, the syntax is slightly different. Where function application uses parentheses, type application takes square brackets. And so, we can apply the `List` type constructor to type parameter `Int`, writing `List[Int]`. The kind of `List[Int]` is obviously `*`: we have applied the type constructor to all its type parameters, we are left with a concrete type. (Just like applying a function to all its parameters yields the return value.) Similarly, `List[List[String]]` is of kind `*`. It is a compile error to say `List[1]`: `1` is a _value_, where `List` expects a _type_, just as much as it is a compile error to say `foo(Int)`: `Int` is a type, not a value.
+Let’s explore this further and define a function `foom`:
+```scala
+trait Functions {
+  type Result = …
+  def foom[M[\_]]: Result = …
+}
+```
+The kind of `M` is `* -> *`: it takes one type parameter (denoted by `_`) and yields a concrete type. So, what type parameter can we give to the function `foom[M[_]]`? We can’t have `foom[Int]`: the kind of `Int` is `*`, but we need `* -> *`. Taking the Scala standard library, we can use `Option`, `List`, `Seq`, etc; any type that needs exactly one type parameter to yield a concrete type. (For example, the kind of `Option`, `List` is `* -> *`; their definition is `sealed abstract class Option[+A]`; `sealed abstract class List[+A]`.) Now, we can’t write `foom[Either]`, because the kind of `Either` is `(*, *) -> *`; recall that either takes two type parameters before yielding a concrete type. After reading about partial applications of functions, it would not be unreasonable to assume that we can partially apply a type constructor; in other words, to partially apply `(*, *) -> *` to some concrete type, yielding `* -> *`. Let’s take a long-winded route and name the partially-applied `Either` type. We have `type EitherS[R] = Either[String, R]`; we can now have `foom[EitherS]`.
+```scala
+trait Functions {
+  type Result = …
+  def foom[M[\_]]: Result = …
+  type EitherS[R] = Either[String, R]
+}
+```
+Sometimes we want to partially apply a type constructor, just like we can partially apply functions, without explicitly naming them. If we want to partially apply `Either` by fixing its first parameter to be a `String`, we can’t write `foom[Either[String, _]]`. It is not valid syntax, `_` does not mean “partially apply type”. Instead, we have to name a type that takes the remaining type parameters in a block, and then access it as a member of that block. We will name our partially applied type λ, and make it take one type parameter. In valid Scala syntax, we have `({type λ[R] = Either[String, R]})#λ`. Notice the similarity between this and partial function application: when we wanted to be difficult & verbose, we wrote `({foo(1, _: Int)})`. In case of the type partial application, we get back a type of kind `* -> *`; in case of the function partial application, we get back a function of type `Int => String`.
+Of course, the function `foom` cannot do anything useful (if it is to remain a pure function); perhaps it should be given a parameter of type `M[_]`: `foom[M[_]](m: M[_]): Result`. With that parameter, we can have `foom[({type L[R] = Either[String, R]})#L](Right(2))`. That’s jolly good, but what about the body of `foom`? We can’t make it do anything “useful”, because we don’t know anything about the type `M[_]` except that it exists and that its type parameter exists.
+== Type classes
+Knowing that something exists is nice, but it does not help us to write code. We would find it more useful if we could say something meaningful about this type that exists. To help our imaginations, let’s invent a new function, and call it `fmap[M[_], A, B](f: A => B, m: M[A]): M[B]`. It is a very generic version of the function `map`. But we’re still stuck in the same position of knowing only existence. We would like to know, and allow others to specify, something about the various `M[_]`s. The `fmap` behaves differently for different types of `M`s—the containers—but it does not care about the elements. The concept we are defining here is a _functor_; and we wish to have different implementations according to the types.
+```scala
+def fmap[M[\_], A, B](f: A ⇒ B, m: M[A])
+					 (implicit F: Functor[M]): M[B] = F.fmap(f, m) 
+trait Functor[M[\_]] {   def fmap[A, B](f: A ⇒ B, m: M[A]): M[B] }
+```
+And then instances for `Option` and `List`:
+```scala
+implicit object OptionFunctor extends Functor[Option] {   override def fmap[A, B](f: A ⇒ B, m: Option[A]): Option[B] = m match {     case Some(a) ⇒ Some(f(a))     case None ⇒ None   } }  implicit object ListFunctor extends Functor[List] {   override def fmap[A, B](f: A ⇒ B, m: List[A]): List[B] = m match {     case Nil ⇒ Nil     case h::t ⇒ f(h)::fmap(f, t)   } }
+```
+Now, can there be an instance of `Fu``nctor` for `Either`? I hope you are all shouting “no,” `Either` has kind `(*, *) -> *`, but `Functor` needs `* -> *`.
+= Why?
+Perhaps this question should have been at the start. Nevertheless, the motivation is to be able to extract common patterns and to apply these patterns to existing types, without introducing inheritance hierarchy. Consider our functor and its `fmap` function that now works on `Option` and `List`, even though the authors of `List` and `Option` did not include `fmap` in their definitions. If you find yourself writing similar code, you should attempt to make it as generic as possible. Once you master this in the world of values (i.e. spotting that there is a `map`, `find`, `foreach` operation), you should master this at the level of types. As further reading, head over to [http://underscore.io/books/shapeless-guide/] and explore Shapeless: a library for type-level programming.
